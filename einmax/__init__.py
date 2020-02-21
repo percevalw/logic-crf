@@ -6,7 +6,7 @@ def einsum(subscripts, *operands):
     einsum_str = subscripts
     input_str, results_index = einsum_str.split('->')
     input_left, input_right = input_str.split(',')
-    idx_rm = "".join(sorted((set(input_left) | set(input_right))) - set(results_index))
+    idx_rm = "".join(sorted((set(input_left) | set(input_right)) - set(results_index)))
     joint_result_index = results_index + idx_rm
     joint_result = torch.einsum(input_str + "->" + joint_result_index, *(o[0] for o in operands))
     removed_shape = joint_result.shape[len(results_index):]
