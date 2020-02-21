@@ -102,7 +102,7 @@ class HintFactor(Factor):
         for new_name, subvars, mapping_states, _ in mapping:
             if mapping_states is None:
                 continue
-            shared_vars = list(set(subvars) & set(self.names))
+            shared_vars = sorted(set(subvars) & set(self.names))
             if shared_vars:
                 indices_in_self = pd.factorize(np.asarray([*self.names, *shared_vars]))[0][len(self.names):]
                 indices_in_new = pd.factorize(np.asarray([*subvars, *shared_vars]))[0][len(subvars):]
@@ -113,7 +113,7 @@ class HintFactor(Factor):
                 new_names.append(new_name)
                 new_shape.append(len(mapping_states))
                 changed_vars |= set(shared_vars)
-        for name in set(self.names) - changed_vars:
+        for name in sorted(set(self.names) - changed_vars):
             indice = np.flatnonzero(self.names == name)[0]
             valid_states_per_new_var.append(states[:, indice].nonzero(as_tuple=True)[0].tolist())
             new_names.append(name)
@@ -179,7 +179,7 @@ class ObservationFactor(Factor):
         for new_name, subvars, mapping_states, _ in mapping:
             if mapping_states is None:
                 continue
-            shared_vars = list(set(subvars) & set(self.names))
+            shared_vars = sorted(set(subvars) & set(self.names))
             if shared_vars:
                 indices_in_self = pd.factorize(np.asarray([*self.names, *shared_vars]))[0][len(self.names):]
                 indices_in_new = pd.factorize(np.asarray([*subvars, *shared_vars]))[0][len(subvars):]
@@ -190,7 +190,7 @@ class ObservationFactor(Factor):
                 new_names.append(new_name)
                 new_shape.append(len(mapping_states))
                 changed_vars |= set(shared_vars)
-        for name in set(self.names) - changed_vars:
+        for name in sorted(set(self.names) - changed_vars):
             indice = np.flatnonzero(self.names == name)[0]
             valid_states_per_new_var.append(states[:, indice].nonzero(as_tuple=True)[0].tolist())
             new_names.append(name)
@@ -254,7 +254,7 @@ class ConstraintFactor(Factor):
         for new_name, subvars, mapping_states, _ in mapping:
             if mapping_states is None:
                 continue
-            shared_vars = list(set(subvars) & set(self.names))
+            shared_vars = sorted(set(subvars) & set(self.names))
             if shared_vars:
                 indices_in_self = pd.factorize(np.asarray([*self.names, *shared_vars]))[0][len(self.names):]
                 indices_in_new = pd.factorize(np.asarray([*subvars, *shared_vars]))[0][len(subvars):]
@@ -265,7 +265,7 @@ class ConstraintFactor(Factor):
                 new_names.append(new_name)
                 new_shape.append(len(mapping_states))
                 changed_vars |= set(shared_vars)
-        for name in set(self.names) - changed_vars:
+        for name in sorted(set(self.names) - changed_vars):
             indice = self.names.index(name)
             valid_states_per_new_var.append(states[:, indice].nonzero(as_tuple=True)[0].tolist())
             new_names.append(name)

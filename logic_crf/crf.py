@@ -6,6 +6,7 @@ from logic_crf.core import Factor
 import pandas as pd
 import numpy as np
 import networkx as nx
+from nlstruct.core.cache import hash_object
 
 from logic_crf.logic import And
 from logic_crf.logic_factors import HintFactor, can_merge, Indexer, ConstraintFactor, ObservationFactor

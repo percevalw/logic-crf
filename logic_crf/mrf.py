@@ -216,8 +216,8 @@ class MRF:
 
         expr, expr_inputs, expr_output = self._pre_run_op(dim=dim, except_dim=except_dim)[0][0]
         eq_inputs, eq_output = expr.contraction.split('->')
-        marginalized_chars = list(set("".join(eq_inputs.split(","))) - set(eq_output))
-        batch_chars = list(set(eq_output) - set(marginalized_chars))
+        marginalized_chars = sorted(set("".join(eq_inputs.split(","))) - set(eq_output))
+        batch_chars = sorted(set(eq_output) - set(marginalized_chars))
         n_batch = len(batch_chars)
         batch_slices = [slice(None)] * n_batch
         letter_to_dim = dict(zip(marginalized_chars, range(len(marginalized_chars))))
@@ -225,8 +225,8 @@ class MRF:
         scores, backtrack = expr(*[(self.tensors[i].exp(), None) for i in expr_inputs], backend='einmax')
         argmax = torch.zeros((len(marginalized_chars), *scores.shape), dtype=torch.long)
         for requires, backpointers in backtrack:
-            permutation = [requires.find(s) for s in batch_chars] + [requires.find(s) for s in set(marginalized_chars) & set(requires)]
-            indices = tuple(argmax[letter_to_dim[letter]] for letter in set(requires) - set(batch_chars))
+            permutation = [requires.find(s) for s in batch_chars] + [requires.find(s) for s in sorted(set(marginalized_chars) & set(requires))]
+            indices = tuple(argmax[letter_to_dim[letter]] for letter in sorted(set(requires) - set(batch_chars)))
             for dest_letter, backpointer in backpointers:
                 backpointer = backpointer.permute(*permutation)
                 flat_inds = tuple(inds.view(-1) for inds in indices)

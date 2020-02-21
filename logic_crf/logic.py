@@ -148,8 +148,8 @@ class LabelSubspace(object):
     def support(self):
         res = set()
         for c in self.children:
-            res |= c.support
-        return res
+            res |= set(c.support)
+        return sorted(res)
 
     @classmethod
     def from_pyeda(cls, expr, factory):
