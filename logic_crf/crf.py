@@ -24,7 +24,7 @@ class CRF(Factor):
         # Either all not None or all None
         assert len({mapping is None, names is None, shape is None}) == 1
         if mapping is None:
-            names, shape = zip(*list(set((v, int(dim)) for fac in factors for v, dim in zip(fac.names, fac.shape))))
+            names, shape = zip(*sorted(set((v, int(dim)) for fac in factors for v, dim in zip(fac.names, fac.shape))))
         super().__init__(shape, names, mapping)
         self.factors = factors  # type: List[Factor]
         self.factor_input_indices = factors_input_indices
@@ -47,7 +47,7 @@ class CRF(Factor):
     def optimize(self):  # observation_set = ["weight", "nnet_outputs"]
         factors = self.factors
 
-        all_variables = list(set(v for factor in factors for v in factor.names))
+        all_variables = sorted(set(v for factor in factors for v in factor.names))
         factors = [new_factor for factor in factors for new_factor in factor.factorize()]
         adjacency_matrix = np.eye(len(all_variables), dtype=bool)
         indices_to_factor = []
@@ -99,7 +99,7 @@ class CRF(Factor):
                     mapping.append((super_variable_name, variables_to_group, valid_assignements, indices_in_input))
                     not_yet_mapped_names -= set(variables_to_group)
                     changed_variables |= set(variables_to_group)
-        for name in not_yet_mapped_names:
+        for name in sorted(not_yet_mapped_names):
             indice_in_input = self.names.index(name)
             mapping.append((name, [name], None, [indice_in_input]))
         # new_variables.extend(set(all_variables) - changed_variables)
@@ -187,7 +187,7 @@ class CRF(Factor):
             indices_in_input = pd.factorize([*names, *subnames])[0][len(names):]
             new_mapping.append((supername, subnames, states, indices_in_input))
             remaining_names -= set(subnames)
-        for name in remaining_names:
+        for name in sorted(remaining_names):
             indice_in_input = names.index(name)
             new_mapping.append((name, [name], [indice_in_input], None))
         factors_input_indices = factorize(
