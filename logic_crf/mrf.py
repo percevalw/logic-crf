@@ -8,6 +8,36 @@ import torch
 from logic_crf.utils import Clique, factorize
 
 
+def logsumexp(expr, operands, no_trick=False):
+    # a bit radical logsumexp trick to avoid overflow, we take that global max of each tensor
+    # we could instead take the max of each sample in the [n_batch, ...] * [n_batch, ...] ... case
+    if isinstance(expr, str):
+        expr_str = expr
+        expr = lambda *args, **kwargs: oe.contract(expr_str, *args, **kwargs)
+
+    if no_trick:
+        return expr(*(o.exp() for o in operands)).log()
+
+    operands_max = [op.max() for op in operands]
+    return expr(*((op - op_max).exp() for op, op_max in zip(operands, operands_max))).log() + sum(operands_max)
+
+
+def logmaxexp(expr, operands, no_trick=False):
+    # a bit radical logsumexp trick to avoid overflow, we take that global max of each tensor
+    # we could instead take the max of each sample in the [n_batch, ...] * [n_batch, ...] ... case
+    if isinstance(expr, str):
+        expr_str = expr
+        expr = lambda *args, **kwargs: oe.contract(expr_str, *args, **kwargs)
+
+    if no_trick:
+        scores, argmax = expr(*((o.exp(), None) for o in operands), backend="einmax")
+        return scores.log(), argmax
+
+    operands_max = [op.max() for op in operands]
+    scores, argmax = expr(*(((op - op_max).exp(), None) for op, op_max in zip(operands, operands_max)), backend="einmax")
+    return scores.log() + sum(operands_max), argmax
+
+
 class MRF:
     def __init__(self, tensors, tensors_scheme, dims_scheme, contract=True, crf=None):
         if contract:
@@ -15,7 +45,7 @@ class MRF:
                 tensors_scheme,
                 tensors,
             )
-            tensors = [expr(*(tensors[i].exp() for i in expr_inputs)).log() for expr, expr_inputs, expr_output in expressions]
+            tensors = [logsumexp(expr, [tensors[i] for i in expr_inputs]) for expr, expr_inputs, _ in expressions]
         self.tensors = tensors
         self.dims_scheme = dims_scheme  # [(states, [3, 4, 5])]
         self.tensors_scheme = tensors_scheme  # [([0, 1, 3, 5])]
@@ -169,14 +199,17 @@ class MRF:
         if cached is None:
             self.crf.cached_executions[hashed] = observations_indexer, new_tensors_scheme, new_dims_scheme, expressions, new_tensors_scheme
 
-        new_tensors = [expr(*(new_tensors[i].exp() for i in expr_inputs)).log() for expr, expr_inputs, _ in expressions]
+        new_tensors = [logsumexp(expr, [new_tensors[i] for i in expr_inputs]) for expr, expr_inputs, _ in expressions]
         if len(new_tensors_scheme) == 1 and all(new_dims_scheme[i][0] is None for i in new_tensors_scheme[0]):
             return new_tensors[0].permute(tuple(np.argsort(new_tensors_scheme[0])))
         return self.__class__(new_tensors, new_tensors_scheme, new_dims_scheme, crf=self.crf)
 
     def logsumexp(self, dim=None, except_dim=None):
         expressions, new_tensors_scheme, new_dims_scheme = self._pre_run_op(dim=dim, except_dim=except_dim)
-        tensors = [expr(*(self.tensors[i].exp() for i in expr_inputs)).log() for expr, expr_inputs, _ in expressions]
+
+        tensors = [logsumexp(expr, [self.tensors[i] for i in expr_inputs])
+                   for expr, expr_inputs, _ in expressions]
+
         if len(new_tensors_scheme) == 1 and all(new_dims_scheme[i][0] is None for i in new_tensors_scheme[0]):
             return tensors[0].permute(tuple(np.argsort(new_tensors_scheme[0])))
         return self.__class__(tensors, new_tensors_scheme, new_dims_scheme, crf=self.crf)
@@ -214,7 +247,7 @@ class MRF:
         available_keep_dims = [dim for states, subdims in self.dims_scheme if states is None for dim in subdims]
         assert all(dim in available_keep_dims for dim in except_dim)
 
-        expr, expr_inputs, expr_output = self._pre_run_op(dim=dim, except_dim=except_dim)[0][0]
+        expr, expr_inputs, expr_output = self._pre_run_op(except_dim=except_dim)[0][0]
         eq_inputs, eq_output = expr.contraction.split('->')
         marginalized_chars = sorted(set("".join(eq_inputs.split(","))) - set(eq_output))
         batch_chars = sorted(set(eq_output) - set(marginalized_chars))
@@ -222,7 +255,8 @@ class MRF:
         batch_slices = [slice(None)] * n_batch
         letter_to_dim = dict(zip(marginalized_chars, range(len(marginalized_chars))))
 
-        scores, backtrack = expr(*[(self.tensors[i].exp(), None) for i in expr_inputs], backend='einmax')
+        # scores, backtrack = expr(*[(self.tensors[i].exp(), None) for i in expr_inputs], backend='einmax')
+        scores, backtrack = logmaxexp(expr, [self.tensors[i] for i in expr_inputs])
         argmax = torch.zeros((len(marginalized_chars), *scores.shape), dtype=torch.long)
         for requires, backpointers in backtrack:
             permutation = [requires.find(s) for s in batch_chars] + [requires.find(s) for s in sorted(set(marginalized_chars) & set(requires))]
@@ -247,4 +281,4 @@ class MRF:
             else:
                 result[..., dest_cols] = states[argmax[col_idx]]
 
-        return scores.log(), result  # [np.argsort([letter_to_dim[letter] for letter in marginalized_chars])]
+        return scores, result  # [np.argsort([letter_to_dim[letter] for letter in marginalized_chars])]
