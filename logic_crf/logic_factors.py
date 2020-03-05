@@ -14,6 +14,7 @@ def can_merge(fac1, fac2):
         return can_merge_mask and can_merge_fn
     return False
 
+
 class MetaIndexer(type):
     def __getitem__(self, item):
         if isinstance(item, tuple):
@@ -155,7 +156,7 @@ class ObservationFactor(Factor):
 
     def forward(self, *args, **kwargs):
         potential = self.fn(*args, **kwargs)
-        return potential[..., self.mask].masked_fill(self.mask == -1, 0).float().log()
+        return (potential[..., self.mask].masked_fill(self.mask == -1, 0).float()).log()
 
     def get_states(self, names=None):
         if names is None:
@@ -230,7 +231,7 @@ class ConstraintFactor(Factor):
         return new_factors
 
     def forward(self, *args, **kwargs):
-        return self.mask.float().log()
+        return (self.mask.float()).log()
 
     def get_states(self, names=None):
         if names is None:
