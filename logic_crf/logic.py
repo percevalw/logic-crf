@@ -128,14 +128,14 @@ class LabelSubspace(object):
         expr = self.vectorize_()
         return eval("lambda c: {}".format(expr))
 
-    def to_python(self):
-        expr = self.to_python_string()
+    def to_python(self, is_list=False):
+        expr = self.to_python_(is_list=is_list)
         return eval("lambda c: {}".format(expr))
 
     def vectorize_(self):
         raise NotImplementedError()
 
-    def to_python_(self):
+    def to_python_(self, **kwargs):
         raise NotImplementedError()
 
     def to_pyeda_(self):
@@ -187,13 +187,13 @@ class And(LabelSubspace):
         else:
             return self.children[0].to_z3_()
 
-    def to_python_(self):
+    def to_python_(self, **kwargs):
         if len(self.children) > 2:
-            return "(all(({})))".format(", ".join(c.to_python_() for c in self.children))
+            return "(all(({})))".format(", ".join(c.to_python_(**kwargs) for c in self.children))
         elif len(self.children) == 2:
-            return "({} & {})".format(self.children[0].to_python_(), self.children[1].to_python_())
+            return "({} & {})".format(self.children[0].to_python_(**kwargs), self.children[1].to_python_(**kwargs))
         else:
-            return self.children[0].to_python_()
+            return self.children[0].to_python_(**kwargs)
 
     def vectorize_(self):
         if len(self.children) > 2:
@@ -205,7 +205,7 @@ class And(LabelSubspace):
 
     def __repr__(self):
         if len(self.children) > 1:
-            return "({})".join(" & ".join(repr(c) for c in self.children))
+            return "({})".format(" & ".join(repr(c) for c in self.children))
         return repr(self.children[0])
 
 
@@ -223,13 +223,13 @@ class Or(LabelSubspace):
         else:
             return self.children[0].to_z3_()
 
-    def to_python_(self):
+    def to_python_(self, **kwargs):
         if len(self.children) > 2:
-            return "(any(({})))".format(", ".join(c.to_python_() for c in self.children))
+            return "(any(({})))".format(", ".join(c.to_python_(**kwargs) for c in self.children))
         elif len(self.children) == 2:
-            return "({} | {})".format(self.children[0].to_python_(), self.children[1].to_python_())
+            return "({} | {})".format(self.children[0].to_python_(**kwargs), self.children[1].to_python_(**kwargs))
         else:
-            return self.children[0].to_python_()
+            return self.children[0].to_python_(**kwargs)
 
     def vectorize_(self):
         if len(self.children) > 2:
@@ -253,14 +253,14 @@ class Not(LabelSubspace):
     def to_z3_(self):
         return z3.Not(*(c.to_z3_() for c in self.children))
 
-    def to_python_(self):
-        return "(~{})".format(self.children[0].to_python_())
+    def to_python_(self, **kwargs):
+        return "(~{})".format(self.children[0].to_python_(**kwargs))
 
     def vectorize_(self):
         return "(~{})".format(self.children[0].vectorize_())
 
     def __repr__(self):
-        return "~{}".join(repr(self.children[0]))
+        return "~{}".format(repr(self.children[0]))
 
 
 class Implies(LabelSubspace):
@@ -271,8 +271,8 @@ class Implies(LabelSubspace):
     def to_z3_(self):
         return z3.Implies(*(c.to_z3_() for c in self.children))
 
-    def to_python_(self):
-        return "(~{} | {})".format(self.children[0].to_python_(), self.children[1].to_python_())
+    def to_python_(self, **kwargs):
+        return "(~{} | {})".format(self.children[0].to_python_(**kwargs), self.children[1].to_python_(**kwargs))
 
     def vectorize_(self):
         return "(~{} | {})".format(self.children[0].vectorize_(), self.children[1].vectorize_())
@@ -289,8 +289,8 @@ class Equivalent(LabelSubspace):
     def to_z3_(self):
         return self.children[0].to_z3_() == self.children[1].to_z3_()
 
-    def to_python_(self):
-        return "({} == {})".format(self.children[0].to_python_(), self.children[1].to_python_())
+    def to_python_(self, **kwargs):
+        return "({} == {})".format(self.children[0].to_python_(**kwargs), self.children[1].to_python_(**kwargs))
 
     def vectorize_(self):
         return "({} == {})".format(self.children[0].vectorize_(), self.children[1].vectorize_())
@@ -306,11 +306,11 @@ class ITE(LabelSubspace):
     def to_z3_(self):
         return z3.If(self.children[0].to_z3_(), self.children[1].to_z3_(), self.children[2].to_z3_())
 
-    def to_python_(self):
-        return "(({} & {}) | (~{} & {}))".format(self.children[0].to_python_(),
-                                                 self.children[1].to_python_(),
-                                                 self.children[0].to_python_(),
-                                                 self.children[2].to_python_())
+    def to_python_(self, **kwargs):
+        return "(({} & {}) | (~{} & {}))".format(self.children[0].to_python_(**kwargs),
+                                                 self.children[1].to_python_(**kwargs),
+                                                 self.children[0].to_python_(**kwargs),
+                                                 self.children[2].to_python_(**kwargs))
 
     def vectorize_(self):
         return "(({} & {}) | (~{} & {}))".format(self.children[0].vectorize_(),
@@ -352,8 +352,8 @@ class AtomLabelSubspace(LabelSubspace):
     def to_pyeda_(self):
         return pyeda.inter.exprvar(self.uid)
 
-    def to_python_(self):
-        return f"c.get('{self.uid}', False)"
+    def to_python_(self, is_list=False, **kwargs):
+        return f"c.get('{self.uid}', False)" if not is_list else f"('{self.uid}' in c)"
 
     def to_z3_(self):
         return z3.Bool(self.uid)
@@ -369,8 +369,8 @@ class ExactlyOne(LabelSubspace):
     def to_pyeda_(self):
         return pyeda.inter.OneHot(*[a.to_pyeda_() for a in self.children])
 
-    def to_python_(self):
-        return "(sum(({})) == 1)".format(", ".join(c.to_python_() for c in self.children))
+    def to_python_(self, **kwargs):
+        return "(sum(({})) == 1)".format(", ".join(c.to_python_(**kwargs) for c in self.children))
 
     def to_z3_(self):
         return z3.PbEq(*[a.to_z3_() for a in self.children], 1)
@@ -386,8 +386,8 @@ class AtMostOne(LabelSubspace):
     def to_pyeda_(self):
         return pyeda.inter.OneHot0(*[a.to_pyeda_() for a in self.children])
 
-    def to_python_(self):
-        return "(sum(({})) <= 1)".format(", ".join(c.to_python_() for c in self.children))
+    def to_python_(self, **kwargs):
+        return "(sum(({})) <= 1)".format(", ".join(c.to_python_(**kwargs) for c in self.children))
 
     def to_z3_(self):
         return z3.AtMost(*[a.to_z3_() for a in self.children], 1)
@@ -409,7 +409,7 @@ class FullSpace(LabelSubspace):
     def to_z3_(self):
         return True
 
-    def to_python_(self):
+    def to_python_(self, **kwargs):
         return "True"
 
     def __repr__(self):
@@ -426,7 +426,7 @@ class Empty(LabelSubspace):
     def to_z3_(self):
         return False
 
-    def to_python_(self):
+    def to_python_(self, **kwargs):
         return "False"
 
     def __repr__(self):
