@@ -1,11 +1,6 @@
-import logging
-import pprint
-
 import numpy as np
 import pandas as pd
 import torch
-from scipy.sparse import issparse, vstack, csr_matrix
-from torch.utils.data import DataLoader, BatchSampler
 
 
 def flatten_array(array, mask=None):
@@ -13,31 +8,16 @@ def flatten_array(array, mask=None):
     Flatten array to get the list of active entries
     If not mask is provided, it's just array.view(-1)
     If a mask is given, then it is array[mask]
-    If the array or the mask are sparse, some optimizations are possible, justifying this function
 
     Parameters
     ----------
-    array: scipy.sparse.spmatrix or np.ndarray or torch.Tensor
-    mask: scipy.sparse.spmatrix or np.ndarray or torch.Tensor
+    array: np.ndarray or torch.Tensor
+    mask: np.ndarray or torch.Tensor
 
     Returns
     -------
     np.ndarray or torch.Tensor
     """
-    if issparse(array):
-        array = array.tocsr()
-        col_bis = array.copy()
-        col_bis.data = np.ones(len(array.data), dtype=bool)
-        if mask is not None and issparse(mask):
-            res = array[mask]
-            # If empty mask, scipy returns a sparse matrix: we use toarray to densify
-            if hasattr(res, 'toarray'):
-                return res.toarray().reshape(-1)
-            # else, scipy returns a 2d matrix, we use asarray to densify
-            return np.asarray(res).reshape(-1)
-        array = array.toarray()
-        if mask is not None:
-            mask = as_numpy_array(mask)
     if isinstance(array, (list, tuple)):
         if mask is None:
             return array
@@ -73,15 +53,15 @@ def factorize(values, mask=None, reference_values=None, freeze_reference=True, k
 
     Parameters
     ----------
-    col: np.ndarray or scipy.sparse.spmatrix or torch.Tensor or list of (np.ndarray or scipy.sparse.spmatrix or torch.Tensor)
+    values: np.ndarray or torch.Tensor or list of (np.ndarray or torch.Tensor) or list of any
         values to factorize
-    mask: np.ndarray or scipy.sparse.spmatrix or torch.Tensor or list of (np.ndarray or scipy.sparse.spmatrix or torch.Tensor) or None
+    mask: np.ndarray or torch.Tensor or list of (np.ndarray or torch.Tensor) or None
         optional mask on col, useful for multiple dimension values arrays
     freeze_reference: bool
         Should we throw out values out of reference values (if given).
         Then we need a mask to mark those rows as disabled
         TODO: handle cases when a mask is not given
-    reference_values: np.ndarray or scipy.sparse.spmatrix or torch.Tensor or list or None
+    reference_values: np.ndarray or torch.Tensor or list or None
         If given, any value in col that is not in prefered_unique_values will be thrown out
         and the mask will be updated to be False for this value
 
@@ -106,10 +86,9 @@ def factorize(values, mask=None, reference_values=None, freeze_reference=True, k
     for values, mask in zip(all_values, all_masks):
         assert (
               (isinstance(mask, np.ndarray) and isinstance(values, np.ndarray)) or
-              (issparse(mask) and issparse(values)) or
               (torch.is_tensor(mask) and torch.is_tensor(values)) or
-              (mask is None and (isinstance(values, (list, tuple, np.ndarray)) or issparse(values) or torch.is_tensor(values)))), (
-            f"values and (optional mask) should be of same type torch.tensor, numpy.ndarray or scipy.sparse.spmatrix. Given types are values: {repr(type(values))} and mask: {repr(type(mask))}")
+              (mask is None and (isinstance(values, (list, tuple, np.ndarray)) or torch.is_tensor(values)))), (
+            f"values and (optional mask) should be of same type torch.tensor, numpy.ndarray. Given types are values: {repr(type(values))} and mask: {repr(type(mask))}")
         all_flat_values.append(flatten_array(values, mask))
         # return all_values[0], all_masks[0], all_values[0].tocsr().data if hasattr(all_values[0], 'tocsr') else all_values#col.tocsr().data if hasattr(col, 'tocsr')
     if torch.is_tensor(all_flat_values[0]):
@@ -144,28 +123,7 @@ def factorize(values, mask=None, reference_values=None, freeze_reference=True, k
     new_values = []
     new_masks = []
     for values, mask, flat_relative_values, unk_mask in zip(all_values, all_masks, all_flat_values, unk_masks):
-        if issparse(values):
-            new_mask = mask
-            values = values.tocsr()
-            if freeze_reference:
-                if mask is None:
-                    new_mask = values.copy()
-                    new_mask.data = unk_mask
-                else:
-                    new_mask.data = new_mask.data & unk_mask
-            if mask is not None:
-                mask = mask.tocsr()
-                values = mask.copy()
-                values.data = flat_relative_values
-                new_col = mask.copy()
-                new_col.data = flatten_array(values, mask)
-                new_values.append(new_col.tolil())
-                new_masks.append(mask.tolil())
-            else:
-                values.data = flat_relative_values
-                new_values.append(values.tolil())
-                new_masks.append(new_mask)
-        elif isinstance(values, (list, tuple)):
+        if isinstance(values, (list, tuple)):
             mask = unk_mask
             if mask is not None:
                 values = [v for v, valid in zip(flat_relative_values, mask) if valid]
