@@ -1,0 +1,7 @@
+recursive-include opt_einsum *.py
+recursive-include einmax *.py
+
+include setup.py
+include README.md
+include LICENSE
+include MANIFEST.in
