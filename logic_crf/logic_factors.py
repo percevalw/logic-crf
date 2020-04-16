@@ -59,7 +59,7 @@ class HintFactor(Factor):
             shape = torch.as_tensor([2 for lit in expr.support])
         super().__init__(shape, names)
         self.expr = expr
-        self.mask = mask
+        self.register_buffer('mask', mask)
         self.fn = fn
 
     def clone(self):
@@ -138,7 +138,7 @@ class ObservationFactor(Factor):
             shape = torch.as_tensor([2 for lit in expr.support])
         super().__init__(shape, names)
         self.expr = expr
-        self.mask = mask
+        self.register_buffer('mask', mask)
         self.fn = fn
 
     def clone(self):
@@ -215,7 +215,7 @@ class ConstraintFactor(Factor):
             shape = torch.as_tensor([2 for lit in expr.support])
         super().__init__(shape, names)
         self.expr = expr
-        self.mask = mask
+        self.register_buffer('mask', mask)
 
     def clone(self):
         return ConstraintFactor(self.expr, self.names, self.shape, self.mask)
