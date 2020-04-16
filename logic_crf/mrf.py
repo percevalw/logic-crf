@@ -168,7 +168,7 @@ class MRF:
         if packed:
             n_batch_dims = len(observations.shape[:-1])
             for i, n in enumerate(observations.shape[:-1]):
-                new_observations.append(torch.arange(n).long().view(*((1 if i != j else -1 for j in range(n_batch_dims)))))
+                new_observations.append(torch.arange(n, device=observations.device).long().view(*((1 if i != j else -1 for j in range(n_batch_dims)))))
 
         for dim, indexer in observations_indexer[n_batch_dims:]:
             states = self.dims_scheme[dim][0]
@@ -236,6 +236,8 @@ class MRF:
         return result
 
     def max(self, dim=None, except_dim=None):
+        device = self.tensors[0].device
+
         assert dim is None or except_dim is None
         if dim is not None:
             except_dim = [i for i in range(len(self.dims_scheme)) if i not in dim]
@@ -257,7 +259,7 @@ class MRF:
 
         # scores, backtrack = expr(*[(self.tensors[i].exp(), None) for i in expr_inputs], backend='einmax')
         scores, backtrack = logmaxexp(expr, [self.tensors[i] for i in expr_inputs])
-        argmax = torch.zeros((len(marginalized_chars), *scores.shape), dtype=torch.long)
+        argmax = torch.zeros((len(marginalized_chars), *scores.shape), dtype=torch.long, device=device)
         for requires, backpointers in backtrack:
             permutation = [requires.find(s) for s in batch_chars] + [requires.find(s) for s in sorted(set(marginalized_chars) & set(requires))]
             indices = tuple(argmax[letter_to_dim[letter]] for letter in sorted(set(requires) - set(batch_chars)))
@@ -265,7 +267,7 @@ class MRF:
                 backpointer = backpointer.permute(*permutation)
                 flat_inds = tuple(inds.view(-1) for inds in indices)
                 flat_backpointers = backpointer.reshape(-1, *backpointer.shape[len(batch_chars):])
-                argmax[letter_to_dim[dest_letter]] = flat_backpointers[(torch.arange(len(flat_backpointers)), *flat_inds)].view(argmax.shape[1:])
+                argmax[letter_to_dim[dest_letter]] = flat_backpointers[(torch.arange(len(flat_backpointers), device=device), *flat_inds)].view(argmax.shape[1:])
 
         letter_to_original_dim = dict(zip("".join(letters for letters in eq_inputs.split(",")), chain.from_iterable(self.tensors_scheme[i] for i in expr_inputs)))
         column_to_original_dim = [letter_to_original_dim[letter] for letter in marginalized_chars]
@@ -273,7 +275,7 @@ class MRF:
         all_dest_cols = [self.dims_scheme[i][1] for i in column_to_original_dim]
         all_dest_cols = factorize(all_dest_cols, reference_values=sorted(chain.from_iterable(all_dest_cols)))[0]
 
-        result = torch.zeros(*argmax.shape[1:], len(set(chain.from_iterable(all_dest_cols))), dtype=torch.bool)
+        result = torch.zeros(*argmax.shape[1:], len(set(chain.from_iterable(all_dest_cols))), device=device, dtype=torch.bool)
         for col_idx, original_dim, dest_cols in zip(range(argmax.shape[0]), column_to_original_dim, all_dest_cols):
             states = self.dims_scheme[original_dim][0]
             if states is None:
