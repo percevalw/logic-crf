@@ -26,7 +26,7 @@ class CRF(Factor):
         if mapping is None:
             names, shape = zip(*sorted(set((v, int(dim)) for fac in factors for v, dim in zip(fac.names, fac.shape))))
         super().__init__(shape, names, mapping)
-        self.factors = factors  # type: List[Factor]
+        self.factors = torch.nn.ModuleList(factors)  # type: List[Factor]
         self.factor_input_indices = factors_input_indices
         self.cached_executions = {}
         self._curried_args = []
