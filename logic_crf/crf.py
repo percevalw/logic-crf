@@ -200,7 +200,12 @@ class CRF(Factor):
         new_self.names = names
         return new_self
 
-    def to(self, device, **kwargs):
+    def cuda(self, device, **kwargs):
         self = super().to(device, **kwargs)
-        self.mapping = [(m[0], m[1], m[2].to(device), m[3]) for m in self.mapping]
+        self.mapping = [(m[0], m[1], m[2].cuda(device), m[3]) for m in self.mapping]
+        return self
+
+    def cpu(self, device, **kwargs):
+        self = super().to(device, **kwargs)
+        self.mapping = [(m[0], m[1], m[2].cpu(device), m[3]) for m in self.mapping]
         return self
