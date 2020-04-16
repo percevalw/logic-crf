@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import torch
+from scipy.sparse import issparse
 
 
 def flatten_array(array, mask=None):
