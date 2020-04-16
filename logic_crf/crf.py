@@ -199,3 +199,8 @@ class CRF(Factor):
         new_self.factors_input_indices = factors_input_indices
         new_self.names = names
         return new_self
+
+    def to(self, device, **kwargs):
+        self = super().to(device, **kwargs)
+        self.mapping = [(m[0], m[1], m[2].to(device), m[3]) for m in self.mapping]
+        return self
