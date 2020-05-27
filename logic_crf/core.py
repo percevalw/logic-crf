@@ -52,6 +52,12 @@ class Factor(torch.nn.Module):
     def factorize(self):
         return [self]
 
+    def _apply(self, fn):
+        self = super()._apply(fn)
+        if self.mapping is not None:
+            self.mapping = [(m[0], m[1], fn(m[2]), m[3]) for m in self.mapping]
+        return self
+
 
 def as_numpy_array(array):
     if isinstance(array, np.ndarray):

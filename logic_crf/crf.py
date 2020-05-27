@@ -199,13 +199,3 @@ class CRF(Factor):
         new_self.factors_input_indices = factors_input_indices
         new_self.names = names
         return new_self
-
-    def cuda(self, device, **kwargs):
-        self = super().to(device, **kwargs)
-        self.mapping = [(m[0], m[1], m[2].cuda(device), m[3]) for m in self.mapping]
-        return self
-
-    def cpu(self, device, **kwargs):
-        self = super().to(device, **kwargs)
-        self.mapping = [(m[0], m[1], m[2].cpu(device), m[3]) for m in self.mapping]
-        return self
